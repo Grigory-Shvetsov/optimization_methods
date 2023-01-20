@@ -1,0 +1,404 @@
+from ast import While
+from cmath import sqrt
+from unittest.util import _MIN_DIFF_LEN
+from sympy.tensor.array import derive_by_array
+from scipy import optimize
+import numpy as np
+import sympy as sp
+import math
+import matplotlib.pyplot as plt
+import scipy.optimize as opt
+
+# Значения функции
+def Val(X_p, Y_p):
+    Value = []
+    for i in range(len(X_p)):
+        Value.insert(0, f(X_p[i], Y_p[i]))
+    return np.sort(Value)
+
+
+def plpl(foo, x: list[float],y: list[float]) -> list[float]:
+    c =[]
+    tmp = [1,1]
+    for i in range(len(x)):
+        #print(i)
+        if i > 0:
+            if c[-1] != foo(x[i],y[i]):     
+                c.append(foo(x[i],y[i]))
+        else:
+            c.append(foo(x[i],y[i]))
+    #с = set(c)
+    #c.sort()
+    #print(c)
+    return c
+
+def plpl1(foo, x: list[float],y: list[float]) -> list[float]:
+    c =[]
+    tmp = [1,1]
+    for i in range(len(x)):
+        #print(i)
+        
+        c.append(foo(x[i],y[i]))
+    #с = set(c)
+    #c.sort()
+    #print(c)
+    return c
+
+def draw_counterplot(x_min, xk, flag, foo):
+    fig, ax = plt.subplots(figsize = (16,8))
+
+    x, y = np.linspace(min(xk[0]) - 1/2, max(xk[0]) + 1/2), np.linspace(min(xk[1]) - 1/2, max(xk[1]) + 1/2)
+    
+    x, y = np.meshgrid(x ,y)
+    
+    z = foo(x,y)
+
+    v = plpl(foo, xk[0], xk[1])
+    v.sort()
+    #print(v)
+    # построим линии уровня
+    ax.contour(x, y, z, levels = sorted(set(Val(xk[0],xk[1]))))
+    # траектория поиска точки минимума
+    ax.plot(xk[0], xk[1], marker='o', markersize = 3, color = 'red')
+    # подписи к осям
+    ax.set_xlabel('$x$', fontsize = 12)
+    ax.set_ylabel('$y$', fontsize = 12)
+    if flag==1:
+        ax.set_title('Регулярный поиск' , fontdict = {'fontsize' : 14})
+    else:
+        ax.set_title('Нерегулярный поиск' , fontdict = {'fontsize' : 14})
+    # создадим сетку 
+    ax.grid(linestyle = '-')
+
+
+
+def draw_plot(xk, foo, levels_mas, flag):
+
+    fig, ax = plt.subplots(figsize = (16,8))
+    x, y = np.linspace(min(xk[0]) - 1/2, max(xk[0]) + 1/2), np.linspace(min(xk[1]) - 1/2, max(xk[1]) + 1/2)
+    x, y = np.meshgrid(x ,y)
+    z = foo(x,y)
+
+    v = plpl(foo, levels_mas[0], levels_mas[1])
+    v = list(set(v))
+
+    v.sort()
+    #print(v)
+    # построим линии уровня
+    ax.contour(x, y, z, levels = v)
+    # траектория поиска точки минимума
+    ax.plot(xk[0], xk[1], marker='o', markersize = 3, color = 'red')
+    
+    # подписи к осям
+    ax.set_xlabel('$x$', fontsize = 12)
+    ax.set_ylabel('$y$', fontsize = 12)
+    if flag==1:
+        ax.set_title('Регулярный поиск' , fontdict = {'fontsize' : 14})
+    else:
+        ax.set_title('Нерегулярный поиск' , fontdict = {'fontsize' : 14})
+    # создадим сетку 
+    ax.grid(linestyle = '-')
+    plt.show()
+
+
+
+
+def draw_counterplot1(x_min, xk, A, flag, foo):
+    fig, ax = plt.subplots(figsize = (5,5))
+
+    x, y = np.linspace(min(xk[0]) - 1/2, max(xk[0]) + 1/2), np.linspace(min(xk[1]) - 1/2, max(xk[1]) + 1/2)
+    
+    x, y = np.meshgrid(x ,y)
+    
+    z = foo(x,y)
+
+    v = plpl(foo, xk[0], xk[1])
+    v = list(set(v))
+    v.sort()
+
+    #print(v)
+    # построим линии уровня
+    ax.contour(x, y, z, levels = v)
+    # траектория поиска точки минимума
+    ax.plot(xk[0], xk[1], marker='o', markersize = 3, color = 'red')
+
+    for k in range(1,len(A[0])):
+        
+        ax.plot ([A[0][k-1],A[0][k]], [A[1][k-1],A[1][k]], marker='o', markersize = 3, color = 'green')
+        #ax.plot (A[0][k], A[1][k], marker='o', markersize = 3, color = 'green')
+
+
+    # подписи к осям
+    ax.set_xlabel('$x$', fontsize = 12)
+    ax.set_ylabel('$y$', fontsize = 12)
+    if flag==1:
+        ax.set_title('Регулярный поиск' , fontdict = {'fontsize' : 14})
+    else:
+        ax.set_title('Нерегулярный поиск' , fontdict = {'fontsize' : 14})
+    # создадим сетку 
+    ax.grid(linestyle = '-')
+
+
+
+    pass
+
+def draw_all(x0, x_min, xk, flag, foo, ang_a = 20, ang_b = 145):
+
+    fig = plt.figure(figsize = (15, 5), dpi=120)
+
+    ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+    ax2 = fig.add_subplot(1, 2, 2)
+    #ax3 = fig.add_subplot(1, 3, 3)
+    plt.subplots_adjust(wspace=0.7)
+
+    coef = max(abs(x0[0] - x_min[0]), abs(x0[1]-x_min[1]))
+    #coef = max(abs( min(xk[0]) - x_min[0]), abs(min(xk[1])-x_min[1]))
+    x, y = np.meshgrid(np.linspace(x_min[0] - coef, x_min[0] + coef, 100),np.linspace(x_min[1] - coef, x_min[1] + coef, 100))
+    z = foo(x, y)
+
+    v = plpl(foo, xk[0], xk[1])
+    v.sort()
+    
+
+    ax1.plot_surface(x,y,z, cmap = 'plasma', alpha = 0.5)
+    ax1.contour3D(x,y,z, 120, cmap = 'plasma', alpha = 0.3)
+    ax1.contour3D(x,y,z, levels = v, colors = 'black', alpha = 0.5) #cmap = 'tab20')
+
+    v = plpl1(foo, xk[0], xk[1])
+    
+    ax1.plot(xk[0], xk[1], v, marker='o', markersize = 3, color = 'red')
+
+    ax1.scatter(xk[0][0], xk[1][0], foo(xk[0][0], xk[1][0]), s = 20, c = 'green', label="$x_{beg}$ - точка начального приближения")
+    ax1.scatter(x_min[0], x_min[1], foo(x_min[0], x_min[1]), s = 20, c = 'red', label="$x_{min}$ - точка минимума")
+    ax1.legend(shadow=True, fontsize=8)
+    ax1.view_init(ang_a, ang_b)
+    ax1.set_xlabel('$x$', fontsize = 12)
+    ax1.set_ylabel('$y$', fontsize = 12)
+    ax1.set_zlabel('$z$', fontsize = 12)
+    ax1.set_title('График поверхности функции', fontdict = {'fontsize' : 14})
+
+
+    #x, y = np.meshgrid(xk[0], xk[1])
+    x, y = np.linspace(min(xk[0]) - 1/2, max(xk[0]) + 1/2), np.linspace(min(xk[1]) - 1/2, max(xk[1]) + 1/2)
+    
+    x, y = np.meshgrid(x ,y)
+    
+    z = foo(x,y)
+
+    v = plpl(foo, xk[0], xk[1])
+    v.sort()
+    # построим линии уровня
+    ax2.contour(x, y, z, v)
+    # траектория поиска точки минимума
+    ax2.plot(xk[0], xk[1], marker='o', markersize = 3, color = 'red')
+    # подписи к осям
+    ax2.set_xlabel('$x$', fontsize = 12)
+    ax2.set_ylabel('$y$', fontsize = 12)
+    ax2.set_title('Линии уровня и траектория поиска точки' , fontdict = {'fontsize' : 14})
+
+    # создадим сетку 
+    ax2.grid(linestyle = '-')
+
+    # k = range(len(w_norm))
+    # #x, y = np.meshgrid(k , w_norm)
+    # ax3.plot(k, w_norm)
+    # ax3.set_xlabel('$k$')
+    # ax3.set_ylabel('$ \| \! \| w_k \| \! \| $')
+    # ax3.set_title('Зависимость нормы \n антиградиента $ \| \! \| w_k \| \! \| $ от параметра $k$')
+
+def lab7_methods(f, eps, x, flag):
+    n_f = 0
+    n_g = 0
+    n_d = 0
+    L = 2
+    xk = [[x[0]],[x[1]]]    
+    levels_mass = [[],[]]
+    n = 2
+    
+
+     #добавляет элементы
+    def my_append(xk, x_simplex):
+        xk[0].append(x_simplex[0][0])
+        xk[1].append(x_simplex[0][1])
+        xk[0].append(x_simplex[1][0])
+        xk[1].append(x_simplex[1][1])
+        xk[0].append(x_simplex[2][0])
+        xk[1].append(x_simplex[2][1])
+        xk[0].append(x_simplex[0][0])
+        xk[1].append(x_simplex[0][1])
+        return xk
+    x_simplex = np.zeros((n+1, n))
+
+    tmp = []
+    
+    x_simplex[0] = np.array(x)
+    x_simplex[1] = np.array([x_simplex[0][0] + L * (sqrt(n+1)+n-1)/(n*sqrt(2)), x_simplex[0][1] + L * (sqrt(n+1)-1)/(n*sqrt(2))])
+    x_simplex[2] = np.array([x_simplex[0][0] + L * (sqrt(n+1)-1)/(n*sqrt(2)), x_simplex[0][1] + L * (sqrt(n+1)+n-1)/(n*sqrt(2))])
+
+    x_simplex = np.array(sorted(x_simplex, key = lambda x: f(x[0],x[1])))
+
+    xk = my_append(xk,x_simplex)
+
+
+    while True:
+
+        n_d += 1  
+        
+        if flag == 1:
+            
+            x_temp = x_simplex[2] + 2 * (x_simplex[0] - x_simplex[2]) + (x_simplex[1] - x_simplex[0])
+
+            if f(x_temp[0],x_temp[1]) < f(x_simplex[2][0],x_simplex[2][1]):
+                n_f += 2
+                x_simplex[2] = x_temp
+
+                xk = my_append(xk,x_simplex)
+    
+            else:
+
+                x_temp = x_simplex[1] + 2 * (x_simplex[0] - x_simplex[1]) + (x_simplex[2] - x_simplex[0])
+
+                if f(x_temp[0],x_temp[1]) < f(x_simplex[1][0],x_simplex[1][1]):
+                    n_f += 2
+                    x_simplex[1] = x_temp
+
+                    xk = my_append(xk,x_simplex)
+
+                else:
+                    x_temp = x_simplex[0] + 2 * (x_simplex[1] - x_simplex[0]) + (x_simplex[2] - x_simplex[1])
+
+                    if f(x_temp[0],x_temp[1]) < f(x_simplex[0][0],x_simplex[0][1]):
+                        n_f += 2
+                        x_simplex[0] = x_temp
+
+                        xk = my_append(xk,x_simplex)
+
+                    else:
+                        L *= delta 
+                        x_simplex[1] = x_simplex[0] + delta * (x_simplex[1] - x_simplex[0])
+                        x_simplex[2] = x_simplex[0] + delta * (x_simplex[2] - x_simplex[0])
+                        xk = my_append(xk,x_simplex)
+            
+            x_simplex = np.array(sorted(x_simplex, key = lambda x: f(x[0],x[1])))    
+            n_f +=2;   
+            #print(x_simplex, "\n")
+            if L < eps:                
+                break
+
+            x_c = np.zeros(2)
+            for i in x_simplex:
+                x_c += i
+            x_c /= 3
+
+    
+            levels_mass.append(x_c)
+            
+
+        elif flag == 2:
+
+            x_c = np.zeros(2)
+            for i in x_simplex:
+                x_c += i
+            x_c /= 3
+
+            if n_d % 8 == 0:
+                
+                x_simplex = np.array(sorted(x_simplex, key = lambda x: f(x[0],x[1])))
+                L = sqrt( (x_simplex[0][0] - x_simplex[1][0] )**2 +  (x_simplex[0][1] - x_simplex[1][1] )**2 )
+                
+                x31 =  x_simplex[0].copy()
+                x32 =  x_simplex[0].copy()
+                #print(x31, x32)
+                
+                x31[0] += (x_simplex[1][0] - x_simplex[0][0]) * 1/2 - (x_simplex[1][1] - x_simplex[0][1]) * sqrt(3)/2
+                x31[1] += (x_simplex[1][0] - x_simplex[0][0]) * sqrt(3)/2 + (x_simplex[1][1] - x_simplex[0][1]) * 1/2
+                x32[0] += (x_simplex[1][0] - x_simplex[0][0]) * 1/2 + (x_simplex[1][1] - x_simplex[0][1]) * sqrt(3)/2
+                x32[1] += - (x_simplex[1][0] - x_simplex[0][0]) * sqrt(3)/2 - (x_simplex[1][1] - x_simplex[0][1]) * 1/2   
+
+                x_simplex[2] = np.array(sorted([x31, x32], key = lambda x: f(x[0],x[1])))[0]
+                
+                xk = my_append(xk,x_simplex)
+
+                x_simplex = np.array(sorted(x_simplex, key = lambda x: f(x[0],x[1]))) 
+            
+            else:
+                x_temp = []
+                x_temp.append((1+alp)/2 * (x_simplex[0] + x_simplex[1]) - alp*x_simplex[2])
+                x_temp.append((1-beta)/2 * (x_simplex[0] + x_simplex[1]) + beta*x_temp[0])
+                x_temp.append((1-gamma)/2 * (x_simplex[0] + x_simplex[1]) + gamma*x_temp[0])
+                x_temp.append((1-gamma)/2 * (x_simplex[0] + x_simplex[1]) + gamma * x_simplex[2])
+
+                x_temp = np.array(sorted(x_temp, key = lambda x: f(x[0],x[1])))[0]
+                
+                n_f += 4
+                
+                if f(x_temp[0],x_temp[1]) < f(x_simplex[2][0],x_simplex[2][1]):
+                    x_simplex[2] = x_temp
+                    n_f += 2
+
+                else:
+                    x_simplex[1] = x_simplex[0] + delta * (x_simplex[1] - x_simplex[0])
+                    x_simplex[2] = x_simplex[0] + delta * (x_simplex[2] - x_simplex[0])
+                
+                
+                xk = my_append(xk,x_simplex)
+
+                x_simplex = np.array(sorted(x_simplex, key = lambda x: f(x[0],x[1])))  
+
+                n_f += 4
+
+                if 1/3 * ( (f(x_simplex[0][0],x_simplex[0][1]) - f(x_c[0],x_c[1])) ** 2 + (f(x_simplex[1][0],x_simplex[1][1]) - f(x_c[0],x_c[1])) ** 2 + (f(x_simplex[2][0],x_simplex[2][1]) - f(x_c[0],x_c[1])) ** 2 ) < eps**2 :
+                    break
+
+                x_c = np.zeros(2)
+                for i in x_simplex:
+                    x_c += i
+                x_c /= 3
+
+                levels_mass[0].append(x_c[0])
+                levels_mass[1].append(x_c[1])
+
+        
+    return x_c, xk, n_f, n_d, levels_mass
+
+
+alpha = 30
+# Начальная точка поиска минимума функции
+X0 = np.array([50, -70])
+eps = 0.000001
+# регулярный симплекс
+delta = 0.5
+# нерегулярный симплекс
+alp = 1
+beta = 2
+gamma = 0.5
+x0 = np.array([50, -70])
+
+
+
+# def Rosenbrock(X):
+#     return alpha * (X[0]**2 - X[1])**2 + (X[0] - 1)**2
+
+# def f1(X):
+#     return 10*X[0]**2 - 4* X[0] * X[1] + 7 * X[1]**2 - 4 * math.sqrt(5) * (5*X[0] -X[1]) - 16    
+
+# def f2(X):
+#     return 6*X[0]**2 - 4* X[0] * X[1] + 3 * X[1]**2 + 4 * math.sqrt(5) * (X[0] +  2* X[1]) +22  
+
+def f1(x, y):
+     return 10*x**2-4*x*y+7*y**2-4*5**(1/2)*(5*x-y)-16
+def f2(x, y):
+     return 6*x**2-4*x*y+3*y**2+4*5**(1/2)*(x+2*y)+22
+def Rosenbrock(x, y):
+     return alpha * (x**2-y)**2 + (x - 1)**2
+
+f = Rosenbrock
+x_min, xk,  n_f, n_d, levels_mass = lab7_methods(f, eps, x0, 2)
+print('Аргумент, x_min = [', x_min[0],', ',x_min[1],']')
+print('Значение, f(x_min) = ',f(x_min[0],x_min[1]))
+print('Кол-во итераций, iter = ',n_d)
+print('Кол-во вызовов функции, value = ', n_f)
+# draw_counterplot(x_min, xk, 2, f)
+
+
+plt.show()

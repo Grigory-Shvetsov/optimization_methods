@@ -1,0 +1,396 @@
+from ast import While
+from operator import mod
+from scipy import optimize
+import numpy as np
+import sympy as sp
+import math
+import matplotlib.pyplot as plt
+
+
+
+# Параметры методов:
+alpha = 30
+eps = 0.01
+X0 = np.array([5, 5])
+
+# функция Розенброка
+f = lambda x, y: alpha * (x**2 - y)**2 + (x - 1)**2
+
+
+# Вычисление градиента:
+x_sym, y_sym = sp.Symbol('x'), sp.Symbol('y')
+Grad_f = sp.tensor.array.derive_by_array(f(x_sym, y_sym), [x_sym, y_sym])
+Grad_f = sp.lambdify((x_sym, y_sym), Grad_f, 'numpy')
+
+
+
+#Метод золотого сечения
+def golden_ratio(phi, n, b = 0.1, a = 0, e = eps):
+    tau = (math.sqrt(5) + 1) / 2
+    Ak, Bk = a, b
+    lk = Bk - Ak
+    Xk1 = Ak + ((Bk - Ak) - (Bk - Ak) / tau)
+    Xk2 = Ak + (Bk - Ak) / tau
+    y1, y2 = phi(Xk1), phi(Xk2)
+    n += 2
+    while lk >= e/1000:
+        if y1 >= y2:
+            Ak = Xk1
+            Xk1 = Xk2
+            Xk2 = Ak + Bk - Xk1
+            y1 = y2
+            y2 = phi(Xk2)
+            n +=1
+        else:
+            Bk = Xk2
+            Xk2 = Xk1
+            Xk1 = Ak + Bk - Xk2
+            y2 = y1
+            y1 = phi(Xk1)
+            n +=1
+        lk = Bk - Ak
+    return (Ak + Bk) / 2, n
+
+
+#Метод сопряженных градиентов
+def conjugate_directions(method):
+    w = lambda X: -np.array(Grad_f(X[0], X[1]))
+    fun = lambda X: f(X[0], X[1])
+    X = X0
+    n = 0
+    phi = lambda kappa: fun(X + kappa * p1)
+    kappa_list, X_p, Y_p = np.empty(0), np.empty(0), np.empty(0)
+    X_p = np.append(X_p, X[0])
+    Y_p = np.append(Y_p, X[1])
+    kappa_list = np.append(kappa_list, 0.1)
+    p1 = w1 = w(X)
+    g = i = 1   
+    if np.linalg.norm(w1) < eps:
+         return X, X_p, Y_p, i, n, g, kappa_list
+    
+    while (True):
+        
+        kappa, n = golden_ratio(phi, n) #находим каппу
+        #kappa, fun_kappa, n = optimize.golden(phi, full_output=True) #находим каппу
+        #kappa = optimize.golden(phi) #находим каппу
+        kappa_list = np.append(kappa_list, kappa)
+
+        Xk = X + kappa * p1 #следующая точка
+        w2 = w(Xk)
+        g += 1
+        if np.linalg.norm(w2) < eps:
+            break
+
+          
+        # выбираем способ
+        if method == 2:
+            gamma = ((np.linalg.norm(w2))**2)/np.dot(w1, p1) #метод сопряженных градиентов
+        elif method == 3:
+            gamma = ((np.linalg.norm(w2))**2)/((np.linalg.norm(w1))**2) #метод Флетчера-Ривса
+        elif method == 4:
+            gamma = np.dot((w2-w1), w2)/((np.linalg.norm(w1))**2) #метод Полака-Рибьера  
+
+        if i % 2 == 0:
+            gamma = 0     
+
+        p2 = gamma * p1 + w2
+        w1 = w2
+        p1 = p2
+        X = Xk
+        X_p = np.append(X_p, X[0])
+        Y_p = np.append(Y_p, X[1])
+        i += 1
+
+    return X, X_p, Y_p, i, n, g, kappa_list
+
+
+
+#Не очень картинки
+def DrawSurfContourAndWk(X2, X3, X4, X2_p, Y2_p, X3_p, Y3_p, X4_p, Y4_p):
+    fig = plt.figure(figsize =(12,5))
+    #fig.canvas.manager.full_screen_toggle()
+
+    axes1 = fig.add_subplot(1, 3, 1)
+    axes2 = fig.add_subplot(1, 3, 2)
+    axes3 = fig.add_subplot(1, 3, 3)
+    
+    fig.canvas.manager.set_window_title('Методы сопряженного градиента')
+
+
+    delta = max(abs(X2[0] - X0[0]), abs(X2[1] - X0[1])) + 0.3
+    X, Y = np.meshgrid(np.linspace(X2[0] - delta, X2[0] + delta, 50),
+    np.linspace(X2[1] - delta, X2[1] + delta, 50))
+    # X, Y = np.meshgrid(X_p1, Y_p1)
+    Z = f(X, Y)
+    axes1.contour(X, Y, Z, levels = Val(X2_p, Y2_p))
+    axes1.plot(X2_p, Y2_p, marker='o', markersize=3, color='red')
+    axes1.set_xlabel('$x$')
+    axes1.set_ylabel('$y$')
+    axes1.set_title('Метод сопряженных градиентов')
+
+   
+    delta = max(abs(X3[0] - X0[0]), abs(X3[1] - X0[1])) + 0.3
+    X, Y = np.meshgrid(np.linspace(X3[0] - delta, X3[0] + delta, 50),
+    np.linspace(X3[1] - delta, X3[1] + delta, 50))
+    # X, Y = np.meshgrid(X_p1, Y_p1)
+    Z = f(X, Y)
+    axes2.contour(X, Y, Z, levels = Val(X3_p, Y3_p))
+    axes2.plot(X3_p, Y3_p, marker='o', markersize=3, color='red')
+    axes2.set_xlabel('$x$')
+    axes2.set_ylabel('$y$')
+    axes2.set_title('Метод Флетчера-Ривса')
+
+
+
+    delta = max(abs(X4[0] - X0[0]), abs(X4[1] - X0[1])) + 0.3
+    X, Y = np.meshgrid(np.linspace(X4[0] - delta, X4[0] + delta, 50),
+    np.linspace(X4[1] - delta, X4[1] + delta, 50))
+    #X, Y = np.meshgrid(X_p2, Y_p2)
+    Z = f(X, Y)
+    axes3.contour(X, Y, Z, levels = Val(X4_p, Y4_p))
+    axes3.plot(X4_p, Y4_p, marker='o', markersize=3, color='red')
+    axes3.set_xlabel('$x$')
+    axes3.set_ylabel('$y$')
+    axes3.set_title('Метод Полака-Рибьера')
+
+
+#3D и линии уровня двух графиков
+def DrawSurfContour(X2, X3, X4, X2_p, Y2_p, X3_p, Y3_p, X4_p, Y4_p):
+    fig = plt.figure(figsize =(12,5))
+    # fig.canvas.manager.full_screen_toggle()
+
+    axes1 = fig.add_subplot(1, 3, 1)
+    axes2 = fig.add_subplot(1, 3, 2)
+    axes3 = fig.add_subplot(1, 3, 3)
+    
+    fig.canvas.manager.set_window_title('Методы сопряженного градиента')
+
+
+
+ #Angles needed for quiver plot
+    anglesx2 = X2_p[1:] - X2_p[:-1]
+    anglesy2 = Y2_p[1:] - Y2_p[:-1]
+
+    delta = max(abs(X2[0] - X0[0]), abs(X2[1] - X0[1])) + 0.3
+    X, Y = np.meshgrid(np.linspace(X2[0] - delta, X2[0] + delta, 50),
+    np.linspace(X2[1] - delta, X2[1] + delta, 50))
+    # X, Y = np.meshgrid(X_p1, Y_p1)
+    Z = f(X, Y)
+    axes1.contourf(X, Y, Z, levels = Val(X2_p, Y2_p))
+    axes1.plot(X2_p, Y2_p, marker='o', markersize=3, color='red')
+    axes1.set_xlabel('$x$')
+    axes1.set_ylabel('$y$')
+    axes1.set_title('Метод сопряженных градиентов')
+    axes1.quiver(X2_p[:-1], Y2_p[:-1], anglesx2, anglesy2, scale_units = 'xy', angles = 'xy', scale = 1, color = 'r', alpha = .3)
+
+   
+
+   #Angles needed for quiver plot
+    anglesx3 = X3_p[1:] - X3_p[:-1]
+    anglesy3 = Y3_p[1:] - Y3_p[:-1]
+    delta = max(abs(X3[0] - X0[0]), abs(X3[1] - X0[1])) + 0.3
+    X, Y = np.meshgrid(np.linspace(X3[0] - delta, X3[0] + delta, 50),
+    np.linspace(X3[1] - delta, X3[1] + delta, 50))
+    # X, Y = np.meshgrid(X_p1, Y_p1)
+    Z = f(X, Y)
+    axes2.contourf(X, Y, Z, levels = Val(X3_p, Y3_p))
+    axes2.plot(X3_p, Y3_p, marker='o', markersize=3, color='red')
+    axes2.set_xlabel('$x$')
+    axes2.set_ylabel('$y$')
+    axes2.set_title('Метод Флетчера-Ривса')
+    axes2.quiver(X3_p[:-1], Y3_p[:-1], anglesx3, anglesy3, scale_units = 'xy', angles = 'xy', scale = 1, color = 'r', alpha = .3)
+
+# Angles needed for quiver plot
+    anglesx4 = X4_p[1:] - X4_p[:-1]
+    anglesy4 = Y4_p[1:] - Y4_p[:-1]
+    delta = max(abs(X4[0] - X0[0]), abs(X4[1] - X0[1])) + 0.3
+    X, Y = np.meshgrid(np.linspace(X4[0] - delta, X4[0] + delta, 50),
+    np.linspace(X4[1] - delta, X4[1] + delta, 50))
+    #X, Y = np.meshgrid(X_p2, Y_p2)
+    Z = f(X, Y)
+    axes3.contourf(X, Y, Z, levels = Val(X4_p, Y4_p))
+    axes3.plot(X4_p, Y4_p, marker='o', markersize=3, color='red')
+    axes3.set_xlabel('$x$')
+    axes3.set_ylabel('$y$')
+    axes3.set_title('Метод Полака-Рибьера')
+    axes3.quiver(X4_p[:-1], Y4_p[:-1], anglesx4, anglesy4, scale_units = 'xy', angles = 'xy', scale = 1, color = 'r', alpha = .3)
+
+
+#3D и линии уровня одного графика
+def Draw(X_, X_p, Y_p, k, X0, eps):
+
+    delta = max(abs(X_[0] - X0[0]), abs(X_[1] - X0[1])) + 1
+    X, Y = np.meshgrid(np.linspace(X_[0] - delta, X_[0] + delta,  100),
+    np.linspace(X_[1] - delta, X_[1] + delta, 100))
+    Z = f(X, Y)
+
+
+    #Angles needed for quiver plot
+    anglesx = X_p[1:] - X_p[:-1]
+    anglesy = Y_p[1:] - Y_p[:-1]
+
+    fig = plt.figure(figsize = (16,8))
+
+    
+
+
+    #Surface plot
+    ax = fig.add_subplot(1, 2, 1, projection='3d')
+    ax.plot_surface(X, Y, Z, rstride = 5, cstride = 5, cmap = 'jet', alpha = .4, edgecolor = 'none' )
+    ax.plot(X_p, Y_p, f(X_p,Y_p), color = 'r', marker = '*', alpha = .4)
+
+
+
+    if k == 1:
+        fig.canvas.manager.set_window_title('Метод сопряженных направлений')
+        ax.set_title('Метод сопряженных направлений (X0 = [' + str(X0[0])+'   '+ str(X0[1])+'], eps = '+str(eps)+')')
+    elif k == 2:
+        fig.canvas.manager.set_window_title('Метод сопряженных градиентов')
+        ax.set_title('Метод сопряженных градиентов (X0 = [' + str(X0[0])+'   '+ str(X0[1])+'], eps = '+str(eps)+')')
+    elif k == 3:
+        fig.canvas.manager.set_window_title('Метод Флетчера-Ривса')
+        ax.set_title('Метод Флетчера-Ривса (X0 = [' + str(X0[0])+'   '+ str(X0[1])+'], eps = '+str(eps)+')')
+
+    elif k == 4:
+        fig.canvas.manager.set_window_title('Метод Полака-Рибьера')
+        ax.set_title('Метод Полака-Рибьера (X0 = [' + str(X0[0])+'   '+ str(X0[1])+'], eps = '+str(eps)+')')
+
+
+
+
+    #ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap='viridis', edgecolor = 'none')
+    ax.scatter(X0[0], X0[1], f(X0[0], X0[1]), s=20, marker='*', c='red', label='X0 - начальное приближение')
+    ax.scatter(X_[0], X_[1], f(X_[0], X_[1]), s=20, marker='*', c='black', label='X - точка минимума')
+    ax.legend(shadow = True, fontsize = 8)
+    ax.view_init(15, 60)
+    ax.set_xlabel('$x$')
+    ax.set_ylabel('$y$')
+    ax.set_zlabel('$z$')
+    ax.set_title('Поверхность данной функции')
+
+
+   
+    #Contour plot
+    ax = fig.add_subplot(1, 2, 2)
+    ax.contourf(X, Y, Z, levels = Val(X_p, Y_p), cmap = 'jet')
+    
+    # Plotting the iterations and intermediate values
+    ax.scatter(X_p, Y_p, color = 'r', marker = '*')
+    ax.quiver(X_p[:-1], Y_p[:-1], anglesx, anglesy, scale_units = 'xy', angles = 'xy', scale = 1, color = 'r', alpha = .3)
+    
+
+
+# Таблица точек и значений
+def DrawPoints(X_p, Y_p, kappa_):
+    for x in range(len(X_p)):
+        #print('X = [','%.3f' % X_p[x], ' ','%.3f' % Y_p[x],']','\tf = ','%.3f' % f(X_p[x],Y_p[x]),'\tkappa = ','%.3f' % kappa_[x])
+        print('X = [', np.round(X_p[x],6), ' ',np.round(Y_p[x],6),']\t',np.round(f(X_p[x],Y_p[x]),6),'\tkappa = ',np.round(kappa_[x],6))
+
+    print()
+
+# Значения функции
+def Val(X_p, Y_p):
+    Value = []
+    for i in range(len(X_p)):
+        Value.insert(0, f(X_p[i],Y_p[i]))
+    return Value
+
+
+def DrawValue(X_p, Y_p):
+    for x in Val(X_p,Y_p):
+        print('Value = ', np.round(x,6))
+
+    print()
+
+##############################################################################################################################################################################
+##############################################################################################################################################################################
+##############################################################################################################################################################################
+
+
+print(" " * 20,' Методы сопряженных градиентов')
+print('Дано:')
+print('Целевая функция:        f(x, y) = ', f(x_sym, y_sym))
+print('Начальное приближение:  X = ', X0)
+print('Точность вычисления:    Eps = ', eps)
+print('Овражгость:             alpha = ', alpha)
+
+
+var = 234
+
+if var == 2:
+    X2, X2_p, Y2_p, i2, n2, g2, kappa_2 = conjugate_directions(2)
+    print('X = ', X2)
+    print('f = ', f(X2[0],X2[1]))
+    print('i = ', i2)
+    print('n = ', n2)
+    print('g = ', g2)
+    #DrawPoints(X2_p, Y2_p, kappa_2) # таблица точек и значений 3
+    #DrawValue(X2_p, Y2_p)
+    Draw(X2, X2_p, Y2_p, 2, X0, eps)
+elif var == 3:
+    X3, X3_p, Y3_p, i3, n3, g3, kappa_3 = conjugate_directions(3)
+    print('X = ', X3)
+    print('f = ', f(X3[0],X3[1]))
+    print('i = ', i3)
+    print('n = ', n3)
+    print('g = ', g3)
+    #DrawPoints(X3_p, Y3_p, kappa_3) # таблица точек и значений 3
+    #DrawValue(X3_p, Y3_p)
+    Draw(X3, X3_p, Y3_p, 3, X0,eps)
+elif var == 4:
+    X4, X4_p, Y4_p, i4, n4, g4, kappa_4 = conjugate_directions(4)
+    print('X = ', np.round(X4, 6))
+    print('f = ', np.round(f(X4[0], X4[1]),6))
+    print('i = ', i4)
+    print('n = ', n4)
+    print('g = ', g4)
+    #DrawPoints(X4_p, Y4_p, kappa_4) # таблица точек и значений 4
+    #DrawValue(X4_p, Y4_p)
+    Draw(X4, X4_p, Y4_p,4,X0,eps)
+elif var == 0:
+    X2, X2_p, Y2_p, i2, n2, g2, kappa_2 = conjugate_directions(2)
+    X3, X3_p, Y3_p, i3, n3, g3, kappa_3 = conjugate_directions(3)
+    X4, X4_p, Y4_p, i4, n4, g4, kappa_4 = conjugate_directions(4)
+    print()
+    print('**********************************************************************************************************************************************************************')
+    print('Методы\t\t\t', '    МСГ\t\t\t', '    Флетчера-Ривса\t\t\t', '    Полака-Рибьера')
+    print('Xmin  \t\t',  X2,'\t\t', X3,'\t', X4)
+    print('f(Xmin)\t\t', f(X2[0], X2[1]),'\t\t\t', f(X3[0],X3[1]),'\t\t\t', f(X4[0], X4[1]))
+    print('i\t\t\t', i2,'\t\t\t\t\t',i3,'\t\t\t\t\t',i4)
+    print('n\t\t\t', n2,'\t\t\t\t\t',n3,'\t\t\t\t\t',n4)
+    print('g\t\t\t', g2,'\t\t\t\t\t',g3,'\t\t\t\t\t',g4)
+    print('**********************************************************************************************************************************************************************')
+    DrawSurfContour(X2, X3, X4, X2_p, Y2_p, X3_p, Y3_p, X4_p, Y4_p)
+    #DrawSurfContourAndWk(X2, X3, X4, X2_p, Y2_p, X3_p, Y3_p, X4_p, Y4_p)
+elif var == 234:
+    X2, X2_p, Y2_p, i2, n2, g2, kappa_2 = conjugate_directions(2)
+    X3, X3_p, Y3_p, i3, n3, g3, kappa_3 = conjugate_directions(3)
+    X4, X4_p, Y4_p, i4, n4, g4, kappa_4 = conjugate_directions(4)
+    print()
+    print('**********************************************************************************************************************************************************************')
+    print('Методы\t\t\t', '    МСГ\t\t\t', '    Флетчера-Ривса\t\t\t', '    Полака-Рибьера')
+    print('Xmin  \t\t',  X2,'\t\t', X3,'\t', X4)
+    print('f(Xmin)\t\t', f(X2[0], X2[1]),'\t\t\t', f(X3[0],X3[1]),'\t\t\t', f(X4[0], X4[1]))
+    print('i\t\t\t', i2,'\t\t\t\t\t',i3,'\t\t\t\t\t',i4)
+    print('n\t\t\t', n2,'\t\t\t\t\t',n3,'\t\t\t\t\t',n4)
+    print('g\t\t\t', g2,'\t\t\t\t\t',g3,'\t\t\t\t\t',g4)
+    print('**********************************************************************************************************************************************************************')
+    #DrawPoints(X2_p, Y2_p, kappa_2) # таблица точек и значений 3
+    Draw(X2, X2_p, Y2_p, 2, X0, eps)
+    #DrawPoints(X3_p, Y3_p, kappa_3) # таблица точек и значений
+    Draw(X3, X3_p, Y3_p, 3, X0, eps)
+    #DrawPoints(X4_p, Y4_p, kappa_4) # таблица точек и значений
+    Draw(X4, X4_p, Y4_p, 4, X0, eps)
+
+
+
+plt.show()
+
+
+
+# Тест
+
+# Все методы дают одно и то же
+# X0 = [-1 -2]
+# eps = 0.001
+# alpha = 1
